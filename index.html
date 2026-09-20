@@ -3,86 +3,122 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>PDF Bulk Downloader</title>
 
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background: #f4f6f8;
-    padding: 30px;
-}
+    body {
+        font-family: Arial, sans-serif;
+        background: #f4f6f8;
+        padding: 30px;
+    }
 
-.container {
-    max-width: 1000px;
-    margin: auto;
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0,0,0,.08);
-}
+    .container {
+        max-width: 1000px;
+        margin: auto;
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.08);
+    }
 
-textarea {
-    width: 100%;
-    height: 400px;
-    box-sizing: border-box;
-    padding: 15px;
-    font-family: monospace;
-    font-size: 13px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-}
+    h2 {
+        margin-top: 0;
+    }
 
-button {
-    padding: 12px 20px;
-    margin: 12px 8px 12px 0;
-    border: none;
-    border-radius: 7px;
-    background: #2563eb;
-    color: white;
-    cursor: pointer;
-    font-size: 15px;
-}
+    textarea {
+        width: 100%;
+        height: 400px;
+        box-sizing: border-box;
+        padding: 15px;
+        font-family: monospace;
+        font-size: 13px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        resize: vertical;
+    }
 
-button:hover {
-    background: #1d4ed8;
-}
+    button {
+        padding: 12px 20px;
+        margin: 12px 8px 12px 0;
+        border: none;
+        border-radius: 7px;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+        font-size: 15px;
+    }
 
-#status {
-    margin-top: 15px;
-    padding: 12px;
-    background: #eef2ff;
-    border-radius: 7px;
-    white-space: pre-wrap;
-}
+    button:hover {
+        background: #1d4ed8;
+    }
 
-#fileList {
-    margin-top: 20px;
-    max-height: 400px;
-    overflow-y: auto;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-}
+    button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+    }
 
-.file {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-bottom: 1px solid #eee;
-}
+    #status {
+        margin-top: 15px;
+        padding: 12px;
+        background: #eef2ff;
+        border-radius: 7px;
+        white-space: pre-wrap;
+    }
 
-.fileName {
-    flex: 1;
-    word-break: break-word;
-}
+    #fileList {
+        margin-top: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+    }
 
-.openBtn {
-    margin: 0;
-    padding: 7px 12px;
-    font-size: 13px;
-    background: #16a34a;
-}
+    .file {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .file:last-child {
+        border-bottom: none;
+    }
+
+    .fileName {
+        flex: 1;
+        word-break: break-word;
+    }
+
+    .openBtn {
+        margin: 0;
+        padding: 7px 12px;
+        font-size: 13px;
+        background: #16a34a;
+    }
+
+    .openBtn:hover {
+        background: #15803d;
+    }
+
+    .downloadBtn {
+        margin: 0;
+        padding: 7px 12px;
+        font-size: 13px;
+        background: #7c3aed;
+    }
+
+    .downloadBtn:hover {
+        background: #6d28d9;
+    }
+
+    .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
 </style>
 </head>
 
@@ -90,37 +126,37 @@ button:hover {
 
 <div class="container">
 
-<h2>📚 PDF Bulk Downloader</h2>
+    <h2>📚 PDF Bulk Downloader</h2>
 
-<p>
-Paste the JSON copied from
-<b>Network → Response</b>.
-</p>
+    <p>
+        Paste the JSON copied from
+        <b>Network → Response</b>.
+    </p>
 
-<textarea
-    id="jsonInput"
-    placeholder="Paste your complete JSON response here..."
-></textarea>
+    <textarea
+        id="jsonInput"
+        placeholder="Paste your complete JSON response here..."
+    ></textarea>
 
-<br>
+    <br>
 
-<button onclick="extractPDFs()">
-    Extract PDFs
-</button>
+    <button onclick="extractPDFs()">
+        🔍 Extract PDFs
+    </button>
 
-<button
-    id="downloadAll"
-    onclick="downloadAll()"
-    disabled
->
-    ⬇ Download All
-</button>
+    <button
+        id="downloadAll"
+        onclick="downloadAll()"
+        disabled
+    >
+        ⬇ Download All
+    </button>
 
-<div id="status">
-    Waiting for JSON...
-</div>
+    <div id="status">
+        Waiting for JSON...
+    </div>
 
-<div id="fileList"></div>
+    <div id="fileList"></div>
 
 </div>
 
@@ -130,9 +166,9 @@ Paste the JSON copied from
 let pdfs = [];
 
 
-/* ============================
+/* =========================================================
    EXTRACT PDF URLS
-============================ */
+========================================================= */
 
 function extractPDFs() {
 
@@ -153,10 +189,12 @@ function extractPDFs() {
         return;
     }
 
+
     try {
 
         const json =
             JSON.parse(input);
+
 
         const contents =
             json?.data?.courseContent;
@@ -171,26 +209,42 @@ function extractPDFs() {
         }
 
 
+        /*
+         * Find PDF items
+         */
+
         pdfs = contents.filter(item => {
 
+            if (!item || !item.url) {
+                return false;
+            }
+
+            const format =
+                String(item.format || "")
+                    .toLowerCase();
+
+            const url =
+                String(item.url || "")
+                    .toLowerCase();
+
             return (
-                item &&
-                item.url &&
-                (
-                    String(item.format)
-                        .toLowerCase() === "pdf"
-                    ||
-                    String(item.url)
-                        .toLowerCase()
-                        .includes(".pdf")
-                )
+                format === "pdf" ||
+                url.includes(".pdf")
             );
 
         });
 
 
+        /*
+         * Clear old list
+         */
+
         list.innerHTML = "";
 
+
+        /*
+         * Display PDFs
+         */
 
         pdfs.forEach((pdf, index) => {
 
@@ -211,6 +265,16 @@ function extractPDFs() {
                 }`;
 
 
+            const buttons =
+                document.createElement("div");
+
+            buttons.className = "buttons";
+
+
+            /*
+             * Open button
+             */
+
             const open =
                 document.createElement("button");
 
@@ -230,18 +294,56 @@ function extractPDFs() {
             };
 
 
+            /*
+             * Individual download button
+             */
+
+            const download =
+                document.createElement("button");
+
+            download.className =
+                "downloadBtn";
+
+            download.textContent =
+                "Download";
+
+
+            download.onclick =
+                function() {
+
+                    downloadPDF(
+                        pdf,
+                        index
+                    );
+
+                };
+
+
+            buttons.appendChild(open);
+
+            buttons.appendChild(download);
+
+
             row.appendChild(name);
 
-            row.appendChild(open);
+            row.appendChild(buttons);
 
             list.appendChild(row);
 
         });
 
 
+        /*
+         * Status
+         */
+
         status.textContent =
             `Found ${pdfs.length} PDF(s).`;
 
+
+        /*
+         * Enable/disable Download All
+         */
 
         document.getElementById(
             "downloadAll"
@@ -258,6 +360,8 @@ function extractPDFs() {
             "downloadAll"
         ).disabled = true;
 
+        list.innerHTML = "";
+
         status.textContent =
             "Invalid JSON:\n" +
             error.message;
@@ -267,9 +371,105 @@ function extractPDFs() {
 }
 
 
-/* ============================
-   OPEN ALL PDF URLS
-============================ */
+/* =========================================================
+   GET SAFE FILE NAME
+========================================================= */
+
+function getFileName(pdf, index) {
+
+    let name =
+        pdf.name ||
+        `file-${index + 1}.pdf`;
+
+
+    name =
+        String(name)
+            .trim();
+
+
+    /*
+     * Remove characters that are problematic
+     * in Windows filenames
+     */
+
+    name =
+        name.replace(
+            /[<>:"/\\|?*]/g,
+            "_"
+        );
+
+
+    /*
+     * Ensure .pdf extension
+     */
+
+    if (
+        !name
+            .toLowerCase()
+            .endsWith(".pdf")
+    ) {
+
+        name += ".pdf";
+
+    }
+
+
+    return name;
+
+}
+
+
+/* =========================================================
+   DOWNLOAD ONE PDF
+========================================================= */
+
+function downloadPDF(pdf, index) {
+
+    const link =
+        document.createElement("a");
+
+
+    link.href =
+        pdf.url;
+
+
+    link.download =
+        getFileName(
+            pdf,
+            index
+        );
+
+
+    /*
+     * Do NOT use window.open()
+     */
+
+    link.target =
+        "_self";
+
+
+    link.rel =
+        "noopener";
+
+
+    document.body.appendChild(
+        link
+    );
+
+
+    link.click();
+
+
+    document.body.removeChild(
+        link
+    );
+
+}
+
+
+/* =========================================================
+   DOWNLOAD ALL PDFs
+========================================================= */
 
 function downloadAll() {
 
@@ -280,44 +480,75 @@ function downloadAll() {
         );
 
         return;
+
     }
 
 
     const status =
-        document.getElementById("status");
+        document.getElementById(
+            "status"
+        );
 
 
     status.textContent =
-        "Opening PDFs...\n\n" +
-        "Chrome may ask you to allow multiple pop-ups.";
+        `Starting ${pdfs.length} PDF download(s)...\n\n` +
+        `If Chrome asks whether to allow multiple downloads, ` +
+        `choose "Allow".`;
 
 
     /*
-     * IMPORTANT:
+     * Download one at a time.
      *
-     * We do NOT use fetch().
-     * Therefore this does not trigger
-     * the previous CORS error.
+     * A small delay helps Chrome process
+     * multiple download requests.
      */
 
     pdfs.forEach((pdf, index) => {
 
-        setTimeout(function() {
+        setTimeout(
+            function() {
 
-            window.open(
-                pdf.url,
-                "_blank"
-            );
+                downloadPDF(
+                    pdf,
+                    index
+                );
 
-        }, index * 300);
+                status.textContent =
+                    `Download requested: ${
+                        index + 1
+                    } / ${
+                        pdfs.length
+                    }\n\n` +
+                    `File: ${
+                        getFileName(
+                            pdf,
+                            index
+                        )
+                    }`;
+
+            },
+            index * 1200
+        );
 
     });
 
 
-    status.textContent =
-        `Attempted to open ${pdfs.length} PDF(s).\n\n` +
-        `If Chrome blocked them, click the pop-up-blocked icon ` +
-        `and allow pop-ups for this page.`;
+    /*
+     * Final status
+     */
+
+    setTimeout(
+        function() {
+
+            status.textContent =
+                `Finished sending download requests for ${
+                    pdfs.length
+                } PDF(s).\n\n` +
+                `Check your browser's Downloads folder.`;
+
+        },
+        pdfs.length * 1200 + 500
+    );
 
 }
 
