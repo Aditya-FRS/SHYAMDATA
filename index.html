@@ -212,16 +212,38 @@ function setStatus(msg, type){
 
 // Recursively walk any JSON structure and collect objects that look like
 // a downloadable file entry (PDF or video): has a "url" (or "fileUrl"/"link")
-// ending in a known file extension, or an explicit format/type that matches.
+// ending in a known file extension, or an explicit format/type/mime that
+// identifies it as a PDF or a video.
 const PDF_EXTENSIONS = ['.pdf'];
-const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v', '.3gp', '.flv', '.wmv', '.ts', '.m3u8'];
+const VIDEO_EXTENSIONS = [
+  '.mp4', '.m4v', '.m4p', '.mkv', '.mov', '.qt', '.webm', '.avi', '.wmv',
+  '.flv', '.f4v', '.3gp', '.3g2', '.ts', '.m2ts', '.mts', '.mpeg', '.mpg',
+  '.m2v', '.mpv', '.ogv', '.ogg', '.vob', '.rm', '.rmvb', '.asf', '.divx',
+  '.mxf', '.m3u8', '.hls', '.dash', '.mpd', '.y4m', '.svi', '.drc', '.gifv'
+];
 const PDF_FORMATS = ['pdf'];
-const VIDEO_FORMATS = ['video', 'mp4', 'mkv', 'mov', 'webm', 'avi', 'm4v', 'hls', 'm3u8'];
+const VIDEO_FORMATS = [
+  'video', 'mp4', 'm4v', 'mkv', 'mov', 'webm', 'avi', 'wmv', 'flv', 'f4v',
+  '3gp', '3g2', 'ts', 'm2ts', 'mts', 'mpeg', 'mpg', 'm2v', 'ogv', 'ogg',
+  'vob', 'rm', 'rmvb', 'asf', 'divx', 'mxf', 'm3u8', 'hls', 'dash', 'mpd'
+];
 
-function detectFileType(url, formatVal){
-  const cleanUrl = (url || '').toLowerCase().split('?')[0];
-  if (PDF_EXTENSIONS.some(ext => cleanUrl.endsWith(ext)) || PDF_FORMATS.includes(formatVal)) return 'pdf';
-  if (VIDEO_EXTENSIONS.some(ext => cleanUrl.endsWith(ext)) || VIDEO_FORMATS.includes(formatVal)) return 'video';
+function detectFileType(url, formatVal, mimeVal){
+  const cleanUrl = (url || '').toLowerCase().split('?')[0].split('#')[0];
+  mimeVal = (mimeVal || '').toLowerCase();
+
+  // 1) explicit MIME type is the most reliable signal
+  if (mimeVal.startsWith('application/pdf')) return 'pdf';
+  if (mimeVal.startsWith('video/') || mimeVal.includes('mpegurl')) return 'video';
+
+  // 2) explicit format/type field
+  if (PDF_FORMATS.includes(formatVal)) return 'pdf';
+  if (VIDEO_FORMATS.includes(formatVal) || formatVal.includes('video')) return 'video';
+
+  // 3) file extension in the URL
+  if (PDF_EXTENSIONS.some(ext => cleanUrl.endsWith(ext))) return 'pdf';
+  if (VIDEO_EXTENSIONS.some(ext => cleanUrl.endsWith(ext))) return 'video';
+
   return null;
 }
 
@@ -233,7 +255,7 @@ function collectPdfFiles(node, results){
     return;
   }
 
-  const urlCandidates = ['url', 'fileUrl', 'link', 'downloadUrl', 'pdfUrl', 'videoUrl', 'streamUrl'];
+  const urlCandidates = ['url', 'fileUrl', 'link', 'downloadUrl', 'pdfUrl', 'videoUrl', 'streamUrl', 'mediaUrl', 'src'];
   let foundUrl = null;
   for (const key of urlCandidates) {
     if (typeof node[key] === 'string' && node[key].trim() !== '') {
@@ -242,8 +264,9 @@ function collectPdfFiles(node, results){
     }
   }
 
-  const formatVal = (node.format || node.type || node.fileType || '').toString().toLowerCase();
-  const fileType = foundUrl ? detectFileType(foundUrl, formatVal) : null;
+  const formatVal = (node.format || node.type || node.fileType || node.contentTypeText || '').toString().toLowerCase();
+  const mimeVal = (node.mimeType || node.mime || node.contentType2 || '').toString();
+  const fileType = foundUrl ? detectFileType(foundUrl, formatVal, mimeVal) : null;
 
   if (foundUrl && fileType) {
     const name = node.name || node.title || node.fileName || foundUrl.split('/').pop();
@@ -353,17 +376,35 @@ extractBtn.addEventListener('click', () => {
 
 function ensureExtension(name, fileType, url){
   name = name || (fileType === 'video' ? 'file.mp4' : 'file.pdf');
-  const lower = name.toLowerCase();
-  const knownExts = fileType === 'video' ? VIDEO_EXTENSIONS : PDF_EXTENSIONS;
-  if (knownExts.some(ext => lower.endsWith(ext))) return name;
+  const lowerName = name.toLowerCase();
+  const allExts = PDF_EXTENSIONS.concat(VIDEO_EXTENSIONS);
+
+  if (allExts.some(ext => lowerName.endsWith(ext))) return name;
 
   // try to infer extension from the URL itself
-  const urlExtMatch = (url || '').toLowerCase().split('?')[0].match(/\.[a-z0-9]+$/);
-  if (urlExtMatch && (PDF_EXTENSIONS.includes(urlExtMatch[0]) || VIDEO_EXTENSIONS.includes(urlExtMatch[0]))) {
-    return name + urlExtMatch[0];
-  }
+  const cleanUrl = (url || '').toLowerCase().split('?')[0].split('#')[0];
+  const matchedExt = allExts.find(ext => cleanUrl.endsWith(ext));
+  if (matchedExt) return name + matchedExt;
+
+  // last resort: generic default per type
   return name + (fileType === 'video' ? '.mp4' : '.pdf');
 }
+
+const MIME_TO_EXT = {
+  'application/pdf': '.pdf',
+  'video/mp4': '.mp4',
+  'video/quicktime': '.mov',
+  'video/x-matroska': '.mkv',
+  'video/webm': '.webm',
+  'video/x-msvideo': '.avi',
+  'video/x-ms-wmv': '.wmv',
+  'video/x-flv': '.flv',
+  'video/3gpp': '.3gp',
+  'video/mpeg': '.mpeg',
+  'video/ogg': '.ogv',
+  'application/vnd.apple.mpegurl': '.m3u8',
+  'application/x-mpegurl': '.m3u8'
+};
 
 // Fetch a file as a blob and save it via a temporary object URL.
 // This triggers a real, silent save-to-disk (no new tab) as long as
@@ -373,10 +414,20 @@ async function fetchAndSave(url, filename, fileType){
   const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const blob = await res.blob();
+
+  let finalName = ensureExtension(filename, fileType, url);
+  // If the server reports a specific content-type and our name doesn't
+  // already end in a matching/known extension, prefer the server's hint.
+  const contentType = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  const hasKnownExt = PDF_EXTENSIONS.concat(VIDEO_EXTENSIONS).some(ext => finalName.toLowerCase().endsWith(ext));
+  if (contentType && MIME_TO_EXT[contentType] && !hasKnownExt) {
+    finalName = filename.replace(/\.[a-z0-9]+$/i, '') + MIME_TO_EXT[contentType];
+  }
+
   const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = objectUrl;
-  a.download = ensureExtension(filename, fileType, url);
+  a.download = finalName;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
