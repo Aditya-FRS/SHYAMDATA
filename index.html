@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JSON PDF Extractor & Downloader</title>
+<title>JSON File Extractor & Downloader (PDF & Video)</title>
 <style>
   :root{
     --bg:#0f1115;
@@ -166,17 +166,18 @@
   .item.state-ok .state{color:var(--success);}
   .item.state-fail .state{color:var(--danger);}
   .item .state{font-size:0.78rem;white-space:nowrap;min-width:80px;text-align:right;}
+  .item .type-badge{flex-shrink:0;font-size:0.68rem;padding:2px 6px;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>JSON &rarr; PDF Extractor &amp; Downloader</h1>
-  <p class="sub">Paste the JSON below, click <b>Extract PDFs</b> to list every PDF file found, then <b>Download All</b>.</p>
+  <h1>JSON &rarr; File Extractor &amp; Downloader (PDF &amp; Video)</h1>
+  <p class="sub">Paste the JSON below, click <b>Extract Files</b> to list every PDF or video file found, then <b>Download All</b>.</p>
 
   <textarea id="jsonInput" placeholder="Paste your JSON here..."></textarea>
 
   <div class="btn-row">
-    <button id="extractBtn">Extract PDFs</button>
+    <button id="extractBtn">Extract Files</button>
     <button id="downloadBtn" class="secondary" disabled>Download All</button>
     <button id="clearBtn" class="secondary">Clear</button>
   </div>
@@ -188,7 +189,7 @@
   <div id="listContainer"></div>
 
   <div class="note">
-    <b>How this works:</b> each PDF is fetched in the background and saved straight to your Downloads folder
+    <b>How this works:</b> each PDF or video is fetched in the background and saved straight to your Downloads folder
     automatically &mdash; no manual clicking needed. A file only fails if the server hosting it blocks
     cross-site access (CORS); those will be listed under <b>Failed</b> with a manual link as a fallback.
   </div>
@@ -210,8 +211,20 @@ function setStatus(msg, type){
 }
 
 // Recursively walk any JSON structure and collect objects that look like
-// a PDF file entry: has a "url" (or "fileUrl"/"link") ending in .pdf,
-// or an explicit format/type of "pdf".
+// a downloadable file entry (PDF or video): has a "url" (or "fileUrl"/"link")
+// ending in a known file extension, or an explicit format/type that matches.
+const PDF_EXTENSIONS = ['.pdf'];
+const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v', '.3gp', '.flv', '.wmv', '.ts', '.m3u8'];
+const PDF_FORMATS = ['pdf'];
+const VIDEO_FORMATS = ['video', 'mp4', 'mkv', 'mov', 'webm', 'avi', 'm4v', 'hls', 'm3u8'];
+
+function detectFileType(url, formatVal){
+  const cleanUrl = (url || '').toLowerCase().split('?')[0];
+  if (PDF_EXTENSIONS.some(ext => cleanUrl.endsWith(ext)) || PDF_FORMATS.includes(formatVal)) return 'pdf';
+  if (VIDEO_EXTENSIONS.some(ext => cleanUrl.endsWith(ext)) || VIDEO_FORMATS.includes(formatVal)) return 'video';
+  return null;
+}
+
 function collectPdfFiles(node, results){
   if (node === null || typeof node !== 'object') return;
 
@@ -220,7 +233,7 @@ function collectPdfFiles(node, results){
     return;
   }
 
-  const urlCandidates = ['url', 'fileUrl', 'link', 'downloadUrl', 'pdfUrl'];
+  const urlCandidates = ['url', 'fileUrl', 'link', 'downloadUrl', 'pdfUrl', 'videoUrl', 'streamUrl'];
   let foundUrl = null;
   for (const key of urlCandidates) {
     if (typeof node[key] === 'string' && node[key].trim() !== '') {
@@ -230,11 +243,11 @@ function collectPdfFiles(node, results){
   }
 
   const formatVal = (node.format || node.type || node.fileType || '').toString().toLowerCase();
-  const looksLikePdf = (foundUrl && foundUrl.toLowerCase().split('?')[0].endsWith('.pdf')) || formatVal === 'pdf';
+  const fileType = foundUrl ? detectFileType(foundUrl, formatVal) : null;
 
-  if (foundUrl && looksLikePdf) {
+  if (foundUrl && fileType) {
     const name = node.name || node.title || node.fileName || foundUrl.split('/').pop();
-    results.push({ name: name, url: foundUrl });
+    results.push({ name: name, url: foundUrl, fileType: fileType });
   }
 
   // Keep walking in case of nested folders/content arrays
@@ -251,11 +264,14 @@ function renderList(files){
     listContainer.innerHTML = '';
     return;
   }
+  const pdfCount = files.filter(f => f.fileType === 'pdf').length;
+  const videoCount = files.filter(f => f.fileType === 'video').length;
   let html = '<div class="list">';
-  html += `<div class="list-header"><span>${files.length} PDF file(s) found</span><span class="badge">ready to download</span></div>`;
+  html += `<div class="list-header"><span>${files.length} file(s) found (${pdfCount} PDF, ${videoCount} video)</span><span class="badge">ready to download</span></div>`;
   files.forEach((f, i) => {
     html += `<div class="item state-pending" id="item-${i}">
       <span class="idx">${i+1}.</span>
+      <span class="badge type-badge">${f.fileType.toUpperCase()}</span>
       <span class="name">${escapeHtml(f.name)}</span>
       <span class="state">waiting&hellip;</span>
     </div>`;
@@ -323,33 +339,44 @@ extractBtn.addEventListener('click', () => {
   });
 
   if (extractedFiles.length === 0){
-    setStatus('No PDF files found in that JSON.', 'err');
+    setStatus('No PDF or video files found in that JSON.', 'err');
     downloadBtn.disabled = true;
   } else {
-    setStatus(`Found ${extractedFiles.length} PDF file(s). Click "Download All" to save them.`, 'ok');
+    const pdfCount = extractedFiles.filter(f => f.fileType === 'pdf').length;
+    const videoCount = extractedFiles.filter(f => f.fileType === 'video').length;
+    setStatus(`Found ${extractedFiles.length} file(s) — ${pdfCount} PDF, ${videoCount} video. Click "Download All" to save them.`, 'ok');
     downloadBtn.disabled = false;
   }
   document.getElementById('summary').innerHTML = '';
   renderList(extractedFiles);
 });
 
-function ensurePdfName(name){
-  name = name || 'file.pdf';
-  return name.toLowerCase().endsWith('.pdf') ? name : name + '.pdf';
+function ensureExtension(name, fileType, url){
+  name = name || (fileType === 'video' ? 'file.mp4' : 'file.pdf');
+  const lower = name.toLowerCase();
+  const knownExts = fileType === 'video' ? VIDEO_EXTENSIONS : PDF_EXTENSIONS;
+  if (knownExts.some(ext => lower.endsWith(ext))) return name;
+
+  // try to infer extension from the URL itself
+  const urlExtMatch = (url || '').toLowerCase().split('?')[0].match(/\.[a-z0-9]+$/);
+  if (urlExtMatch && (PDF_EXTENSIONS.includes(urlExtMatch[0]) || VIDEO_EXTENSIONS.includes(urlExtMatch[0]))) {
+    return name + urlExtMatch[0];
+  }
+  return name + (fileType === 'video' ? '.mp4' : '.pdf');
 }
 
 // Fetch a file as a blob and save it via a temporary object URL.
 // This triggers a real, silent save-to-disk (no new tab) as long as
 // the host allows cross-origin fetch (CORS). If it doesn't, we throw
 // and the caller records it as failed.
-async function fetchAndSave(url, filename){
+async function fetchAndSave(url, filename, fileType){
   const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const blob = await res.blob();
   const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = objectUrl;
-  a.download = ensurePdfName(filename);
+  a.download = ensureExtension(filename, fileType, url);
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -375,7 +402,7 @@ downloadBtn.addEventListener('click', async () => {
     setItemState(i, 'progress');
     setStatus(`Downloading ${i+1} of ${total}: ${file.name}`);
     try{
-      await fetchAndSave(file.url, file.name);
+      await fetchAndSave(file.url, file.name, file.fileType);
       done++;
       setItemState(i, 'ok');
     } catch(err){
