@@ -1,12 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDF Bulk Downloader</title>
 
 <style>
 body {
-    font-family: Arial;
+    font-family: Arial, sans-serif;
     background: #f4f6f8;
     padding: 30px;
 }
@@ -16,7 +17,8 @@ body {
     margin: auto;
     background: white;
     padding: 25px;
-    border-radius: 10px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
 }
 
 textarea {
@@ -34,28 +36,52 @@ button {
     padding: 12px 20px;
     margin: 12px 8px 12px 0;
     border: none;
-    border-radius: 6px;
+    border-radius: 7px;
     background: #2563eb;
     color: white;
     cursor: pointer;
     font-size: 15px;
 }
 
-button:disabled {
-    background: #999;
+button:hover {
+    background: #1d4ed8;
 }
 
 #status {
     margin-top: 15px;
     padding: 12px;
     background: #eef2ff;
-    border-radius: 6px;
+    border-radius: 7px;
     white-space: pre-wrap;
 }
 
+#fileList {
+    margin-top: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
 .file {
-    padding: 7px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
     border-bottom: 1px solid #eee;
+}
+
+.fileName {
+    flex: 1;
+    word-break: break-word;
+}
+
+.openBtn {
+    margin: 0;
+    padding: 7px 12px;
+    font-size: 13px;
+    background: #16a34a;
 }
 </style>
 </head>
@@ -67,30 +93,31 @@ button:disabled {
 <h2>📚 PDF Bulk Downloader</h2>
 
 <p>
-Copy the JSON from <b>Network → Response</b> and paste it below:
+Paste the JSON copied from
+<b>Network → Response</b>.
 </p>
 
 <textarea
-id="jsonInput"
-placeholder="Paste your complete JSON response here..."
+    id="jsonInput"
+    placeholder="Paste your complete JSON response here..."
 ></textarea>
 
 <br>
 
 <button onclick="extractPDFs()">
-Extract PDFs
+    Extract PDFs
 </button>
 
 <button
-id="downloadButton"
-onclick="downloadAll()"
-disabled
+    id="downloadAll"
+    onclick="downloadAll()"
+    disabled
 >
-Download All PDFs
+    ⬇ Download All
 </button>
 
 <div id="status">
-Waiting for JSON...
+    Waiting for JSON...
 </div>
 
 <div id="fileList"></div>
@@ -103,13 +130,13 @@ Waiting for JSON...
 let pdfs = [];
 
 
-/* =========================
-   EXTRACT PDF INFORMATION
-========================= */
+/* ============================
+   EXTRACT PDF URLS
+============================ */
 
 function extractPDFs() {
 
-    const text =
+    const input =
         document.getElementById("jsonInput").value.trim();
 
     const status =
@@ -118,30 +145,18 @@ function extractPDFs() {
     const list =
         document.getElementById("fileList");
 
-    if (!text) {
+    if (!input) {
 
         status.textContent =
-            "Please paste the JSON first.";
+            "Please paste the JSON.";
 
         return;
     }
 
-
     try {
 
         const json =
-            JSON.parse(text);
-
-
-        /*
-        Your API structure:
-
-        data
-          └── courseContent
-                  ├── name
-                  ├── url
-                  └── format
-        */
+            JSON.parse(input);
 
         const contents =
             json?.data?.courseContent;
@@ -150,33 +165,28 @@ function extractPDFs() {
         if (!Array.isArray(contents)) {
 
             throw new Error(
-                "data.courseContent was not found."
+                "data.courseContent[] not found"
             );
 
         }
 
 
-        /*
-        Extract every PDF that has a URL
-        */
+        pdfs = contents.filter(item => {
 
-        pdfs =
-            contents.filter(item => {
+            return (
+                item &&
+                item.url &&
+                (
+                    String(item.format)
+                        .toLowerCase() === "pdf"
+                    ||
+                    String(item.url)
+                        .toLowerCase()
+                        .includes(".pdf")
+                )
+            );
 
-                return (
-                    item &&
-                    item.url &&
-                    (
-                        String(item.format)
-                            .toLowerCase() === "pdf"
-                        ||
-                        String(item.url)
-                            .toLowerCase()
-                            .includes(".pdf")
-                    )
-                );
-
-            });
+        });
 
 
         list.innerHTML = "";
@@ -184,32 +194,59 @@ function extractPDFs() {
 
         pdfs.forEach((pdf, index) => {
 
-            const div =
+            const row =
                 document.createElement("div");
 
-            div.className = "file";
+            row.className = "file";
 
-            div.textContent =
-                (index + 1) +
-                ". " +
-                (pdf.name || "PDF");
 
-            list.appendChild(div);
+            const name =
+                document.createElement("div");
+
+            name.className = "fileName";
+
+            name.textContent =
+                `${index + 1}. ${
+                    pdf.name || "PDF"
+                }`;
+
+
+            const open =
+                document.createElement("button");
+
+            open.className = "openBtn";
+
+            open.textContent =
+                "Open";
+
+
+            open.onclick = function() {
+
+                window.open(
+                    pdf.url,
+                    "_blank"
+                );
+
+            };
+
+
+            row.appendChild(name);
+
+            row.appendChild(open);
+
+            list.appendChild(row);
 
         });
 
 
         status.textContent =
-            "Found " +
-            pdfs.length +
-            " PDF(s).";
+            `Found ${pdfs.length} PDF(s).`;
 
 
         document.getElementById(
-            "downloadButton"
+            "downloadAll"
         ).disabled =
             pdfs.length === 0;
-
 
     }
 
@@ -218,7 +255,7 @@ function extractPDFs() {
         pdfs = [];
 
         document.getElementById(
-            "downloadButton"
+            "downloadAll"
         ).disabled = true;
 
         status.textContent =
@@ -230,188 +267,57 @@ function extractPDFs() {
 }
 
 
-/* =========================
-   DOWNLOAD ALL
-========================= */
+/* ============================
+   OPEN ALL PDF URLS
+============================ */
 
-async function downloadAll() {
+function downloadAll() {
 
-    if (pdfs.length === 0) {
+    if (!pdfs.length) {
 
         alert(
-            "Extract the PDFs first."
+            "Extract PDFs first."
         );
 
         return;
     }
 
 
-    const button =
-        document.getElementById(
-            "downloadButton"
-        );
-
     const status =
-        document.getElementById(
-            "status"
-        );
-
-
-    button.disabled = true;
-
-
-    let success = 0;
-    let failed = 0;
-
-
-    for (
-        let i = 0;
-        i < pdfs.length;
-        i++
-    ) {
-
-        const pdf =
-            pdfs[i];
-
-
-        status.textContent =
-            "Downloading " +
-            (i + 1) +
-            " / " +
-            pdfs.length +
-            "\n\n" +
-            pdf.name;
-
-
-        try {
-
-            const response =
-                await fetch(
-                    pdf.url,
-                    {
-                        credentials: "include"
-                    }
-                );
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    "HTTP " +
-                    response.status
-                );
-
-            }
-
-
-            const blob =
-                await response.blob();
-
-
-            const blobURL =
-                URL.createObjectURL(
-                    blob
-                );
-
-
-            const link =
-                document.createElement("a");
-
-
-            link.href =
-                blobURL;
-
-
-            link.download =
-                cleanName(
-                    pdf.name ||
-                    "document-" +
-                    (i + 1) +
-                    ".pdf"
-                );
-
-
-            document.body.appendChild(
-                link
-            );
-
-
-            link.click();
-
-
-            link.remove();
-
-
-            URL.revokeObjectURL(
-                blobURL
-            );
-
-
-            success++;
-
-
-            /*
-            Wait between downloads
-            */
-
-            await delay(700);
-
-        }
-
-        catch(error) {
-
-            console.error(
-                pdf.name,
-                error
-            );
-
-            failed++;
-
-        }
-
-    }
+        document.getElementById("status");
 
 
     status.textContent =
-        "Finished!\n\n" +
-        "Downloaded: " +
-        success +
-        "\n" +
-        "Failed: " +
-        failed;
+        "Opening PDFs...\n\n" +
+        "Chrome may ask you to allow multiple pop-ups.";
 
 
-    button.disabled = false;
+    /*
+     * IMPORTANT:
+     *
+     * We do NOT use fetch().
+     * Therefore this does not trigger
+     * the previous CORS error.
+     */
 
-}
+    pdfs.forEach((pdf, index) => {
+
+        setTimeout(function() {
+
+            window.open(
+                pdf.url,
+                "_blank"
+            );
+
+        }, index * 300);
+
+    });
 
 
-/* =========================
-   CLEAN FILE NAME
-========================= */
-
-function cleanName(name) {
-
-    return String(name)
-        .replace(
-            /[<>:"\/\\|?*]/g,
-            "_"
-        )
-        .trim();
-
-}
-
-
-/* =========================
-   DELAY
-========================= */
-
-function delay(ms) {
-
-    return new Promise(
-        resolve =>
-            setTimeout(resolve, ms)
-    );
+    status.textContent =
+        `Attempted to open ${pdfs.length} PDF(s).\n\n` +
+        `If Chrome blocked them, click the pop-up-blocked icon ` +
+        `and allow pop-ups for this page.`;
 
 }
 
